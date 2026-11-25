@@ -15,7 +15,7 @@ from threading import Lock
 from urllib.parse import urlsplit
 
 from lead_engine import blocked, campaigns, closing, database, domain, load_rows
-from lead_discovery import find_leads
+from lead_discovery import discover_areas
 from lead_coohom import PRESET
 
 ROOT = Path(__file__).resolve().parent
@@ -210,7 +210,7 @@ class Dashboard(BaseHTTPRequestHandler):
             path = urlsplit(self.path).path
             if path == "/api/discover":
                 with DISCOVERY_LOCK:
-                    results = find_leads(STATE / "discovery/cities15000.zip",
+                    results = discover_areas(STATE / "discovery/cities15000.zip",
                                          data["city"].strip().casefold(), data["country"].strip().upper(),
                                          data["category"].strip().casefold(), data.get("radius", 10))
                 self.send_json(200, results)

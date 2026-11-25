@@ -123,3 +123,5 @@ Expand a result to read its profile, score breakdown, website excerpts, evidence
 - **Verification deferred** — Check the provider credentials and the remaining daily balance. Pending Verifalia jobs resume from the same SQLite state.
 - **Another run in progress** — Wait for that run to finish before starting another browser or CLI job against the same state.
 - **Fresh copy cannot find the model** — Pass `--api` and `--model` to the CLI, or set `LEADENGINE_API_URL` and `LEADENGINE_MODEL` in the dashboard service environment. To run the dashboard on a different LAN, pass the Arch host address via `--bind` and the subnet via `--allow`. Update the user service path if you install elsewhere.
+
+Search multiple cities in one request by separating their names with commas. In India, Punjab searches Ludhiana, Amritsar, and Jalandhar. Uttar Pradesh searches Lucknow, Kanpur, and Noida. Delhi NCR searches Delhi, Noida, and Gurugram. The selected radius applies around each city center. The results show the searched cities and any unavailable areas.

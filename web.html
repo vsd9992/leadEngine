@@ -22,7 +22,7 @@
 <h2>Find local businesses</h2>
 <form id="search">
 <div class="search">
-<label>City <input name="city" required value="Delhi"></label>
+<label>Locations <input name="city" required value="Delhi" placeholder="Delhi, Punjab, Uttar Pradesh"></label>
 <label>Country code <input name="country" required maxlength="2" value="IN"></label>
 <label>Business category <input name="category" required list="prospect-categories" placeholder="e.g. Modular kitchen studio"></label>
 <datalist id="prospect-categories"><option value="Modular kitchen studio"><option value="Wardrobe manufacturer"><option value="Custom furniture brand"><option value="Furniture store"><option value="Interior design firm"></datalist>
@@ -31,7 +31,9 @@
 <button type="submit">Find leads</button>
 </form>
 <p class="muted"><a href="https://docs.overturemaps.org/guides/places/" target="_blank" rel="noopener">Overture Maps Places</a> businesses with a listed website. City data from <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>.</p>
+<p class="muted">Separate cities with commas. Delhi NCR, Punjab, and Uttar Pradesh search named city centers.</p>
 <p id="search-message" role="status"></p>
+<p id="search-scope" class="muted" hidden></p>
 <p id="search-terms" class="muted" hidden></p>
 <div id="found"></div>
 <button id="use-leads" type="button" hidden>Use selected leads</button>
@@ -121,6 +123,7 @@ $("search").addEventListener("submit",async event=>{
   button.disabled = true;
   found.replaceChildren();
   $("search-terms").hidden = true;
+  $("search-scope").hidden = true;
   $("use-leads").hidden = true;
   $("search-message").textContent = "Searching the business directory…";
   try {
@@ -129,6 +132,10 @@ $("search").addEventListener("submit",async event=>{
     const response = await api("/api/discover",searchTerms);
     incoming = response.leads;
     searchTerms.location = response.location;
+    const failures = (response.failed_areas || []).map(item => item.area + " (" + item.message + ")");
+    $("search-scope").textContent = `Searched city centers: ${response.searched_cities.join(", ")}.`
+      + (failures.length ? " Unavailable: " + failures.join("; ") : "");
+    $("search-scope").hidden = false;
     const corrected = response.category && response.category !== searchTerms.category.trim().toLowerCase()
       ? `Showing results for “${response.category}”. ` : "";
     searchTerms.category = response.category || searchTerms.category;
@@ -167,10 +174,11 @@ $("use-leads").addEventListener("click",()=>{
   const quote = value => '"' + value.replaceAll('"','""') + '"';
   $("csv").value = ["business_name,website_url,lead_source_url,email,email_source_url",
     ...selected.map(row=>[row.business_name,row.website_url,row.lead_source_url,"",""].map(quote).join(","))].join("\n");
-  const city = searchTerms.location.split(",")[0];
-  form.elements.market.value = searchTerms.location;
-  form.elements.location.value = `Operates in or near ${searchTerms.location}`;
-  form.elements.location_phrases.value = city;
+  const cities = [...new Set(selected.map(row => row.search_city))];
+  const market = cities.join(", ") + ` (${searchTerms.country.trim().toUpperCase()})`;
+  form.elements.market.value = market.slice(0,120);
+  form.elements.location.value = `Operates in or near ${market}`;
+  form.elements.location_phrases.value = cities.join("\n");
   form.elements.business_type.value = searchTerms.category;
   form.elements.business_type_phrases.value = searchTerms.category;
   countSelected();

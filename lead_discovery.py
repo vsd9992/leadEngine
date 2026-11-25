@@ -1,5 +1,6 @@
 """Find businesses with published websites in the open Overture Places data."""
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 import json
 import math
@@ -205,3 +206,70 @@ def find_leads(data_file, city_name, country, category, radius):
     return {"location": f"{city[1]}, {country}", "leads": [item[1] for item in ranked[:50]],
             "category": category, "related_terms": expanded, "matched_places": matched_places,
             "suggestions": [label for label, _ in related.most_common(4)]}
+
+
+# State searches use named commercial centers, with the same radius as city searches.
+INDIA_HUBS = {
+    "delhi ncr": ("delhi", "noida", "gurugram"),
+    "punjab": ("ludhiana", "amritsar", "jalandhar"),
+    "uttar pradesh": ("lucknow", "kanpur", "noida"),
+    "up": ("lucknow", "kanpur", "noida"),
+}
+
+
+def discover_areas(data_file, areas, country, category, radius):
+    requested = list(dict.fromkeys(part.strip() for part in areas.split(",") if part.strip()))
+    if not 1 <= len(requested) <= 5:
+        raise ValueError("Enter one to five comma-separated cities or supported regions.")
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        raise ValueError("Enter a two-letter country code.")
+    if not words(category) or len(category) > 80 or radius not in (5, 10, 20):
+        raise ValueError("Enter a business category and choose a search radius.")
+    if not Path(data_file).is_file():
+        raise ValueError("The city index is missing. Run the discovery data setup.")
+
+    hubs = INDIA_HUBS if country == "IN" else {}
+    locations = list(dict.fromkeys(city for area in requested for city in hubs.get(area, (area,))))
+    if len(locations) > 9:
+        raise ValueError("This search expands to more than nine city centers. Split it into two searches.")
+    if len(locations) == 1:
+        result = find_leads(data_file, locations[0], country, category, radius)
+        city = result["location"].rsplit(", ", 1)[0]
+        return {**result, "searched_cities": [city], "failed_areas": [],
+                "leads": [{**row, "search_city": city} for row in result["leads"]]}
+
+    interpret_category(category)
+
+    def search(city):
+        try:
+            return find_leads(data_file, city, country, category, radius), None
+        except ValueError as error:
+            return None, {"area": city.title(), "message": str(error)}
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        responses = list(pool.map(search, locations))
+    results = [result for result, _ in responses if result]
+    failures = [error for _, error in responses if error]
+    if not results:
+        raise ValueError("No areas could be searched. " + " ".join(
+            f"{item['area']}. {item['message']}" for item in failures
+        ))
+
+    cities_found = [result["location"].rsplit(", ", 1)[0] for result in results]
+    leads = []
+    seen = set()
+    # Give each city a chance to appear before filling the 50-domain pilot limit.
+    for index in range(max(len(result["leads"]) for result in results)):
+        for city, result in zip(cities_found, results):
+            if index >= len(result["leads"]):
+                continue
+            row = result["leads"][index]
+            key = domain(row["website_url"])
+            if key not in seen and len(leads) < 50:
+                seen.add(key)
+                leads.append({**row, "search_city": city})
+
+    return {**results[0], "location": ", ".join(cities_found) + f" ({country})",
+            "searched_cities": cities_found, "leads": leads, "failed_areas": failures,
+            "matched_places": sum(result["matched_places"] for result in results),
+            "suggestions": list(dict.fromkeys(term for result in results for term in result["suggestions"]))[:4]}
