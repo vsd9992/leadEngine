@@ -236,7 +236,8 @@ class RecoveringCrawler:
                         await self.browser.start()
                     except Exception as error:
                         raise BrowserUnavailable("Chromium could not start") from error
-                return await crawl(self.browser, website, coohom=coohom)
+                data = await crawl(self.browser, website, coohom=coohom, recover=self.close)
+                return data
             except Exception as error:
                 if not isinstance(error, BrowserUnavailable) and not browser_closed(error):
                     raise
@@ -248,21 +249,29 @@ class RecoveringCrawler:
                     raise BrowserUnavailable("Chromium failed again after a fresh session") from error
 
 
-async def crawl(crawler, url, coohom=False):
+async def crawl(crawler, url, coohom=False, recover=None):
     from bs4 import BeautifulSoup
     from crawl4ai import CacheMode, CrawlerRunConfig
 
     key = domain(url)
-    home = f"{urlsplit(url).scheme}://{urlsplit(url).netloc}/"
+    home = urldefrag(url).url
     queue = [home]
     pages, addresses = {}, {}
     for target in queue:
         config = CrawlerRunConfig(cache_mode=CacheMode.BYPASS, check_robots_txt=True,
                                   page_timeout=25000, remove_overlay_elements=True)
-        result = await crawler.arun(target, config=config)
+        try:
+            result = await crawler.arun(target, config=config)
+            if not result.success and browser_closed(getattr(result, "error_message", "")):
+                raise BrowserUnavailable("Chromium closed during navigation")
+        except Exception as error:
+            browser_error = isinstance(error, BrowserUnavailable) or browser_closed(error)
+            if recover and target != home and any(pages.values()) and browser_error:
+                # Preserve pages already collected and discard the dead session.
+                await recover()
+                break
+            raise
         final = getattr(result, "redirected_url", None) or result.url or target
-        if not result.success and browser_closed(getattr(result, "error_message", "")):
-            raise BrowserUnavailable("Chromium closed during navigation")
         if not result.success or domain(final) != key:
             if coohom and target != home:
                 continue
@@ -273,6 +282,14 @@ async def crawl(crawler, url, coohom=False):
                 raise WebsiteUnavailable("The site's robots.txt disallows this crawl.")
             if "timeout" in failure or "timed out" in failure:
                 raise WebsiteUnavailable("The website did not respond before the timeout.")
+            if "err_name_not_resolved" in failure or "err_dns" in failure:
+                raise WebsiteUnavailable("The website hostname could not be resolved (DNS).")
+            if "blocked by anti-bot" in failure or "403" in failure or "access denied" in failure:
+                raise WebsiteUnavailable("The website blocked automated access.")
+            if "err_cert_" in failure or "err_ssl_" in failure:
+                raise WebsiteUnavailable("The website has a TLS or certificate error.")
+            if "err_connection_refused" in failure:
+                raise WebsiteUnavailable("The website refused the connection.")
             raise WebsiteUnavailable("The website could not be loaded.")
         soup = BeautifulSoup(result.html, "html.parser")
         if target == home:

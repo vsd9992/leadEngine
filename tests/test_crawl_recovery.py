@@ -59,3 +59,30 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 await crawler.crawl(FIRST)
             self.assertIn(SECOND, (await crawler.crawl(SECOND))[0])
             self.assertEqual(crawler.restarts, 0)
+
+    async def test_optional_page_crash_keeps_homepage_and_reopens_browser(self):
+        contact = FIRST + "contact"
+
+        class BrowserWithContact(Browser):
+            async def arun(self, target, config):
+                result = await super().arun(target, config)
+                if target == FIRST:
+                    result.html = '<main>Business website<a href="/contact">Contact</a></main>'
+                return result
+
+        first = BrowserWithContact({contact: CLOSED})
+        replacement = Browser({})
+        browsers = iter((first, replacement))
+        async with RecoveringCrawler(lambda shell: next(browsers)) as crawler:
+            self.assertIn(FIRST, (await crawler.crawl(FIRST, coohom=True))[0])
+            self.assertTrue(first.closed)
+            self.assertIn(SECOND, (await crawler.crawl(SECOND))[0])
+        self.assertEqual(first.visits, [FIRST, contact])
+        self.assertEqual(replacement.visits, [SECOND])
+
+    async def test_dns_has_specific_message_and_does_not_restart_browser(self):
+        browser = Browser({FIRST: "Page.goto: net::ERR_NAME_NOT_RESOLVED"})
+        async with RecoveringCrawler(lambda shell: browser) as crawler:
+            with self.assertRaisesRegex(WebsiteUnavailable, "DNS"):
+                await crawler.crawl(FIRST)
+            self.assertEqual(crawler.restarts, 0)
