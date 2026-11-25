@@ -118,6 +118,11 @@ def run_details():
                 results.setdefault(item["domain"], {}).update(item)
             elif "input" in item:
                 summary = item
+    if current.get("kind") == "qualify" and current["phase"] == "complete":
+        failed = summary.get("crawl_failures", 0)
+        processed = summary.get("qualified", 0) + summary.get("review", 0) + summary.get("out_of_scope", 0)
+        if failed:
+            current["phase"] = "crawl failed" if failed == processed else "completed with crawl failures"
     return {**current, "results": list(results.values()), "summary": summary}
 
 

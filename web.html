@@ -189,7 +189,7 @@ async function api(path, data) {
   return result;
 }
 const lines = value => value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-const metrics = {input:"Input",qualified:"Qualified",review:"Needs review",out_of_scope:"Out of scope",crawl_failures:"Crawl failures",no_email:"Missing email",emails_checked:"Checks started",exported:"Exported",cached:"Cached"};
+const metrics = {input:"Input",qualified:"Qualified",review:"Needs review",out_of_scope:"Out of scope",crawl_failures:"Crawl failures",browser_restarts:"Browser restarts",browser_failures:"Browser failures",no_email:"Missing email",emails_checked:"Checks started",exported:"Exported",cached:"Cached"};
 let previous = "";
 async function refresh() {
   const state = await api("/api/status");
@@ -276,7 +276,7 @@ async function refresh() {
       }
     }
     if (row.reason) {
-      const item = document.createElement("li"); item.textContent = row.reason.replaceAll("_"," "); list.append(item);
+      const item = document.createElement("li"); item.textContent = row.detail || row.reason.replaceAll("_"," "); list.append(item);
     }
     detail.append(name,list); $("results").append(detail);
   }

@@ -2,7 +2,7 @@
 import argparse
 import asyncio
 import base64
-from contextlib import closing, contextmanager, nullcontext
+from contextlib import closing, contextmanager
 import csv
 from datetime import datetime, timezone
 import hashlib
@@ -177,6 +177,77 @@ def blocked(db, email, key):
     ).fetchone() is not None
 
 
+class BrowserUnavailable(RuntimeError):
+    """The browser session cannot continue processing websites."""
+
+
+class WebsiteUnavailable(ValueError):
+    """A website could not be fetched or did not provide usable content."""
+
+
+def browser_closed(error):
+    message = str(error).lower()
+    return any(marker in message for marker in (
+        "target page, context or browser has been closed",
+        "browser has been closed", "browser is not available",
+        "browser disconnected", "connection closed while reading from the driver",
+        "page crashed", "target crashed",
+    ))
+
+
+class RecoveringCrawler:
+    def __init__(self, factory=None):
+        self.factory = factory or self.make_browser
+        self.browser = None
+        self.headless_shell = False
+        self.restarts = 0
+
+    @staticmethod
+    def make_browser(headless_shell):
+        from crawl4ai import AsyncWebCrawler, BrowserConfig
+
+        config = BrowserConfig(headless=True, verbose=False)
+        if headless_shell:
+            # An unset channel selects Playwright's bundled headless shell.
+            config.chrome_channel = None
+        return AsyncWebCrawler(config=config)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        await self.close()
+
+    async def close(self):
+        browser, self.browser = self.browser, None
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                # A dead driver may reject shutdown. Its session is discarded.
+                pass
+
+    async def crawl(self, website, coohom=False):
+        for attempt in range(2):
+            try:
+                if self.browser is None:
+                    try:
+                        self.browser = self.factory(self.headless_shell)
+                        await self.browser.start()
+                    except Exception as error:
+                        raise BrowserUnavailable("Chromium could not start") from error
+                return await crawl(self.browser, website, coohom=coohom)
+            except Exception as error:
+                if not isinstance(error, BrowserUnavailable) and not browser_closed(error):
+                    raise
+                await self.close()
+                if attempt == 0:
+                    self.restarts += 1
+                    self.headless_shell = not self.headless_shell
+                else:
+                    raise BrowserUnavailable("Chromium failed again after a fresh session") from error
+
+
 async def crawl(crawler, url, coohom=False):
     from bs4 import BeautifulSoup
     from crawl4ai import CacheMode, CrawlerRunConfig
@@ -190,10 +261,19 @@ async def crawl(crawler, url, coohom=False):
                                   page_timeout=25000, remove_overlay_elements=True)
         result = await crawler.arun(target, config=config)
         final = getattr(result, "redirected_url", None) or result.url or target
+        if not result.success and browser_closed(getattr(result, "error_message", "")):
+            raise BrowserUnavailable("Chromium closed during navigation")
         if not result.success or domain(final) != key:
             if coohom and target != home:
                 continue
-            raise ValueError("Page crawl failed or redirected outside the site")
+            if result.success:
+                raise WebsiteUnavailable("The website redirected to a different domain.")
+            failure = str(getattr(result, "error_message", "") or "").lower()
+            if "robots.txt" in failure:
+                raise WebsiteUnavailable("The site's robots.txt disallows this crawl.")
+            if "timeout" in failure or "timed out" in failure:
+                raise WebsiteUnavailable("The website did not respond before the timeout.")
+            raise WebsiteUnavailable("The website could not be loaded.")
         soup = BeautifulSoup(result.html, "html.parser")
         if target == home:
             links = {}
@@ -222,7 +302,7 @@ async def crawl(crawler, url, coohom=False):
             tag.decompose()
         pages[final] = " ".join(soup.get_text(" ", strip=True).split())
     if not any(pages.values()):
-        raise ValueError("No text extracted")
+        raise WebsiteUnavailable("The website returned no usable text.")
     # Only select public, same-domain general business mailboxes automatically.
     contacts = [(address, source) for address, source in addresses.items()
                 if address.split("@")[1].removeprefix("www.") == key
@@ -532,7 +612,7 @@ async def run_pilot(db, args):
     stats = dict(input=count, unique_businesses=len(leads), crawl_failures=0, qualified=0,
                  review=0, out_of_scope=0, no_email=0, emails_checked=0, eligible=0,
                  exported=0, domain_quota_deferred=0, verification_deferred=0,
-                 provider_unavailable=0, cached=0)
+                 provider_unavailable=0, cached=0, browser_restarts=0, browser_failures=0)
     accounts = [] if args.skip_verification else verifier_accounts()
     candidates = []
     seen = set()
@@ -548,11 +628,8 @@ async def run_pilot(db, args):
 
 
 async def process_leads(db, args, config, api, signature, stats, accounts, candidates, seen, leads):
-    from crawl4ai import AsyncWebCrawler, BrowserConfig
-
     verify_only = getattr(args, "verify_only", False)
-    browser = nullcontext() if verify_only else AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False))
-    async with browser as crawler:
+    async with RecoveringCrawler() as crawler:
         for key, lead in leads.items():
             if not admit(db, today(), key):
                 stats["domain_quota_deferred"] += 1
@@ -568,14 +645,16 @@ async def process_leads(db, args, config, api, signature, stats, accounts, candi
                 result = None
                 start = time.monotonic()
                 try:
-                    if config.get("mode") == "coohom":
-                        pages, contacts = await crawl(crawler, lead["website_url"], coohom=True)
-                    else:
-                        pages, contacts = await crawl(crawler, lead["website_url"])
+                    pages, contacts = await crawler.crawl(lead["website_url"], coohom=config.get("mode") == "coohom")
                 except Exception as error:
                     stats["crawl_failures"] += 1
-                    result = {"state": "review", "reason": "crawl_failure",
-                              "error_type": type(error).__name__}
+                    browser_error = isinstance(error, BrowserUnavailable)
+                    if browser_error:
+                        stats["browser_failures"] += 1
+                    detail = str(error) if isinstance(error, (WebsiteUnavailable, BrowserUnavailable)) else ""
+                    result = {"state": "review", "reason": "browser_failure" if browser_error else "crawl_failure",
+                              "error_type": type(error).__name__, "detail": detail}
+                stats["browser_restarts"] = crawler.restarts
                 crawl_seconds = round(time.monotonic() - start, 3)
                 if result is None:
                     try:
