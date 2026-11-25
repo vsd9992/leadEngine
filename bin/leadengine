@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+export LEADENGINE_HOME="${LEADENGINE_HOME:-$root/state}"
+export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$root/.browsers}"
+export CRAWL4AI_NO_CLOUD_NOTICE=1
+export LEADENGINE_REOON_KEY_FILE="${LEADENGINE_REOON_KEY_FILE:-$root/_reoonAPI}"
+
+if [ -d "$root/.runtime/libroot/usr/lib" ]; then
+    export LD_LIBRARY_PATH="$root/.runtime/libroot/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+exec "$root/.venv/bin/leadengine" "$@"

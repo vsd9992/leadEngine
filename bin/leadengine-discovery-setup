@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+mkdir -p "$root/state/discovery"
+target="$root/state/discovery/cities15000.zip"
+temp=$(mktemp "$target.XXXXXX")
+trap 'rm -f "$temp"' EXIT HUP INT TERM
+curl -fsSL --max-time 90 https://download.geonames.org/export/dump/cities15000.zip -o "$temp"
+"$root/.venv/bin/python" -m zipfile -t "$temp"
+mv "$temp" "$target"

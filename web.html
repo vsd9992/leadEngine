@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>leadEngine · Pilot workspace</title>
+<style>
+:root{color-scheme:dark;--base:#101817;--panel:#182422;--line:#344841;--ink:#ecf5ef;--muted:#b5c7be;--mint:#b6f5ab;--orange:#ffd698;font:16px system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--base);color:var(--ink)}main,header>div{max-width:1160px;margin:auto;padding:0 24px}header{border-bottom:1px solid var(--line);background:#14201d}header>div{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:10px}header strong{font-size:1.25rem;letter-spacing:-.04em}header span,.muted{color:var(--muted)}h1{font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.07em;margin:36px 0 8px}h2{font-size:1.25rem;margin:0 0 20px}.subtitle{margin:0 0 28px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:22px;margin-bottom:20px;min-width:0}label{display:block;font-size:.9rem;font-weight:600;margin:0 0 13px}input:not([type=checkbox]),textarea,select{display:block;width:100%;margin-top:6px;border:1px solid #527065;border-radius:8px;padding:10px;background:#101b18;color:var(--ink);font:inherit}textarea{min-height:86px;resize:vertical}.files{margin:16px 0}.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}button,.download{border:1px solid var(--mint);border-radius:8px;padding:9px 14px;font:600 1rem system-ui;text-decoration:none;background:var(--mint);color:#152116;cursor:pointer}.download,button.secondary{background:transparent;color:var(--mint)}button:disabled{opacity:.55;cursor:wait}#message{color:var(--orange)}#phase{background:#293f36;border-radius:999px;padding:5px 11px;text-transform:capitalize}.metrics{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.metrics span{border:1px solid var(--line);padding:6px 9px;border-radius:7px}details{border-top:1px solid var(--line);padding:12px 0}summary{cursor:pointer;overflow-wrap:anywhere}li{margin:.5em 0;overflow-wrap:anywhere}a{color:var(--mint)}.outreach{display:grid;grid-template-columns:1fr 1.4fr 1.4fr auto;gap:10px;align-items:end}.outreach label{margin:0}button:focus-visible,a:focus-visible{outline:2px solid white;outline-offset:3px}@media(max-width:760px){.grid,.outreach{grid-template-columns:1fr}main,header>div{padding:0 15px}.panel{padding:16px}}
+[hidden]{display:none!important}.tabs{margin:0 0 20px}.tabs button[aria-current="step"]{background:var(--mint);color:#152116}.search{display:grid;grid-template-columns:1.3fr 1fr 2fr 1fr;gap:12px}.pick{display:grid;grid-template-columns:auto 1fr auto;gap:12px;padding:11px 0;border-top:1px solid var(--line);align-items:center}.pick label{margin:0}.pick small{display:block;color:var(--muted)}@media(max-width:760px){.search{grid-template-columns:1fr 1fr}.pick{grid-template-columns:auto 1fr}}
+</style>
+</head>
+<body>
+<header><div><strong>leadEngine</strong><span>Local network workspace</span></div></header>
+<main>
+<h1>Lead workspace</h1>
+<nav class="actions tabs" aria-label="Workflow">
+<button type="button" class="secondary" data-pane="discovery" aria-current="step">Find leads</button>
+<button type="button" class="secondary" data-pane="qualification">Qualify</button>
+<button type="button" class="secondary" data-pane="verification">Verify</button>
+</nav>
+<section id="discovery" class="panel">
+<h2>Find local businesses</h2>
+<form id="search">
+<div class="search">
+<label>City <input name="city" required value="Delhi"></label>
+<label>Country code <input name="country" required maxlength="2" value="IN"></label>
+<label>Business category <input name="category" required list="prospect-categories" placeholder="e.g. Modular kitchen studio"></label>
+<datalist id="prospect-categories"><option value="Modular kitchen studio"><option value="Wardrobe manufacturer"><option value="Custom furniture brand"><option value="Furniture store"><option value="Interior design firm"></datalist>
+<label>Radius <select name="radius"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="20">20 km</option></select></label>
+</div>
+<button type="submit">Find leads</button>
+</form>
+<p class="muted"><a href="https://docs.overturemaps.org/guides/places/" target="_blank" rel="noopener">Overture Maps Places</a> businesses with a listed website. City data from <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>.</p>
+<p id="search-message" role="status"></p>
+<p id="search-terms" class="muted" hidden></p>
+<div id="found"></div>
+<button id="use-leads" type="button" hidden>Use selected leads</button>
+</section>
+<div id="qualification" class="grid" hidden>
+<form id="campaign" class="panel">
+<h2>Prospect qualification</h2>
+<label>Qualification profile <select id="qualification-mode"><option value="coohom">COOHOM prospect identifier</option><option value="custom">Custom campaign</option></select></label>
+<div id="coohom-fields">
+<label>Market <input name="market" maxlength="120"></label>
+<label>Prospect focus <textarea name="focus" maxlength="300"></textarea></label>
+<details><summary>Research notes</summary><label>Optional priorities or exclusions <textarea name="notes" maxlength="500"></textarea></label></details>
+<p class="muted">Scores out of 50. Customer-facing design and sales carry the most weight. Kitchen, wardrobe and custom furniture workflows are prioritized.</p>
+</div>
+<div id="custom-fields" hidden>
+<label>Offer <input name="offer" required></label>
+<div id="criteria"></div>
+<label>Disqualifiers, one per line <textarea name="disqualifiers"></textarea></label>
+</div>
+<p id="selected-count" class="muted"></p>
+<details><summary>Import or edit CSV</summary>
+<label class="files">Upload lead CSV <input id="upload" type="file" accept=".csv,text/csv"></label>
+<label>Lead CSV <textarea id="csv" spellcheck="false"></textarea></label>
+</details>
+<button id="start" type="submit">Qualify leads</button>
+<p id="message" role="status"></p>
+</form>
+<section class="panel" aria-labelledby="results-title">
+<div class="actions"><h2 id="results-title" style="margin:0">Run results</h2><span id="phase" aria-live="polite">Loading</span></div>
+<div id="metrics" class="metrics"></div>
+<div id="results"></div>
+</section>
+</div>
+<div id="verification" hidden>
+<section class="panel">
+<h2>Verify qualified contacts</h2>
+<p class="muted" id="provider"></p>
+<p id="verify-summary"></p>
+<div class="actions"><button id="verify-start" type="button" disabled>Verify qualified emails</button> <a class="download" id="download" href="/review.csv" hidden>Download review CSV</a></div>
+<p id="verify-message" role="status"></p>
+<div id="verify-results"></div>
+</section>
+<section class="panel">
+<h2>Record outreach</h2>
+<form id="outreach" class="outreach">
+<label>Event <select name="event"><option value="sent">Sent</option><option value="bounce">Bounce</option><option value="opt_out">Opt-out</option></select></label>
+<label>Email <input type="email" name="email" required></label>
+<label>Business website <input type="url" name="website" required></label>
+<button class="secondary">Record event</button>
+</form>
+<p id="event-message" role="status"></p>
+</section>
+</div>
+</main>
+<script>
+const $ = name => document.getElementById(name);
+const criteria = {location:"Target location",business_type:"Business type",buying_signal:"Buying signal"};
+const form = $("campaign");
+const coohomScores = {customer_design:["Customer-facing design",15],commerce_reach:["Commerce reach",10],product_alignment:["Product alignment",10],commercial_digital:["Commercial and digital viability",10],manufacturing:["Manufacturing integration",5]};
+function updateMode() {
+  const coohom = $("qualification-mode").value === "coohom";
+  $("coohom-fields").hidden = !coohom;
+  $("custom-fields").hidden = coohom;
+  $("custom-fields").querySelectorAll("input,textarea").forEach(field=>field.disabled=coohom);
+}
+$("qualification-mode").addEventListener("change",updateMode);
+const tabs = [...document.querySelectorAll("[data-pane]")];
+function showPane(name) {
+  for (const tab of tabs) {
+    const active = tab.dataset.pane === name;
+    $(tab.dataset.pane).hidden = !active;
+    if (active) tab.setAttribute("aria-current","step");
+    else tab.removeAttribute("aria-current");
+  }
+}
+tabs.forEach(tab => tab.addEventListener("click",()=>showPane(tab.dataset.pane)));
+const found = $("found");
+let incoming = [], searchTerms = {};
+function countSelected() {
+  const rows = $("csv").value.trim().split(/\r?\n/).length - 1;
+  $("selected-count").textContent = rows ? `${rows} lead rows ready to qualify.` : "Find leads or import a CSV.";
+}
+$("csv").addEventListener("input",countSelected);
+$("search").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const button = event.target.querySelector("button");
+  button.disabled = true;
+  found.replaceChildren();
+  $("search-terms").hidden = true;
+  $("use-leads").hidden = true;
+  $("search-message").textContent = "Searching the business directory…";
+  try {
+    searchTerms = Object.fromEntries(new FormData(event.target));
+    searchTerms.radius = Number(searchTerms.radius);
+    const response = await api("/api/discover",searchTerms);
+    incoming = response.leads;
+    searchTerms.location = response.location;
+    const corrected = response.category && response.category !== searchTerms.category.trim().toLowerCase()
+      ? `Showing results for “${response.category}”. ` : "";
+    searchTerms.category = response.category || searchTerms.category;
+    if (response.related_terms?.length) {
+      $("search-terms").textContent = "Also searched: " + response.related_terms.join(", ");
+      $("search-terms").hidden = false;
+    }
+    const suggestions = response.suggestions?.length ? ` Try ${response.suggestions.join(", ")}.` : "";
+    $("search-message").textContent = corrected + (incoming.length
+      ? `${incoming.length} businesses with websites near ${response.location}. Select the ones to qualify.`
+      : response.matched_places
+        ? `${response.matched_places} directory listings matched near ${response.location}, but none had a usable website.${suggestions}`
+        : `No directory listings matched that category near ${response.location}.${suggestions || " Try a related category or a wider radius."}`);
+    incoming.forEach((row,index)=>{
+      const container = document.createElement("div"), box = document.createElement("input"),
+            label = document.createElement("label"), address = document.createElement("small"),
+            link = document.createElement("a");
+      container.className = "pick"; box.type = "checkbox"; box.id = "lead-"+index;
+      box.value = index; box.checked = index < 5;
+      label.htmlFor = box.id; label.textContent = row.business_name;
+      address.textContent = row.locality + (row.match_type === "related" ? " · Related match: " + row.matched_term : "");
+      label.append(address);
+      const url = new URL(row.website_url);
+      link.href = url.href; link.textContent = url.hostname;
+      link.target = "_blank"; link.rel = "noopener";
+      container.append(box,label,link); found.append(container);
+    });
+    $("use-leads").hidden = incoming.length === 0;
+  } catch(error) {
+    $("search-message").textContent = error.message;
+  } finally { button.disabled = false; }
+});
+$("use-leads").addEventListener("click",()=>{
+  const selected = [...found.querySelectorAll("input:checked")].map(box=>incoming[box.value]);
+  if (!selected.length) { $("search-message").textContent = "Select at least one business."; return; }
+  const quote = value => '"' + value.replaceAll('"','""') + '"';
+  $("csv").value = ["business_name,website_url,lead_source_url,email,email_source_url",
+    ...selected.map(row=>[row.business_name,row.website_url,row.lead_source_url,"",""].map(quote).join(","))].join("\n");
+  const city = searchTerms.location.split(",")[0];
+  form.elements.market.value = searchTerms.location;
+  form.elements.location.value = `Operates in or near ${searchTerms.location}`;
+  form.elements.location_phrases.value = city;
+  form.elements.business_type.value = searchTerms.category;
+  form.elements.business_type_phrases.value = searchTerms.category;
+  countSelected();
+  showPane("qualification");
+});
+for (const [key, title] of Object.entries(criteria)) {
+  const fields = document.createElement("fieldset");
+  fields.style.cssText = "border:0;padding:0;margin:0";
+  fields.innerHTML = `<label>${title}<input name="${key}" required></label><label>Evidence phrases for ${title.toLowerCase()}, one per line<textarea name="${key}_phrases" required></textarea></label>`;
+  $("criteria").append(fields);
+}
+async function api(path, data) {
+  const response = await fetch(path, data === undefined ? {} : {method:"POST",headers:{"Content-Type":"application/json","X-LeadEngine":"dashboard"},body:JSON.stringify(data)});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Dashboard request failed.");
+  return result;
+}
+const lines = value => value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+const metrics = {input:"Input",qualified:"Qualified",review:"Needs review",out_of_scope:"Out of scope",crawl_failures:"Crawl failures",no_email:"Missing email",emails_checked:"Checks started",exported:"Exported",cached:"Cached"};
+let previous = "";
+async function refresh() {
+  const state = await api("/api/status");
+  const signature = JSON.stringify(state);
+  if (signature === previous) return;
+  previous = signature;
+  const verifying = state.kind === "verify";
+  const completed = state.phase === "complete";
+  $("phase").textContent = state.phase;
+  $("verify-start").disabled = state.phase === "running" || !(state.summary?.qualified > 0);
+  $("verify-summary").textContent = verifying && state.phase === "running" ? "Checking qualified emails…"
+    : completed && verifying ? `${state.summary?.emails_checked || 0} new checks started. ${state.summary?.exported || 0} leads ready for export.`
+    : state.summary?.qualified ? `${state.summary.qualified} qualified businesses. ${state.summary.no_email || 0} without an email.`
+    : "Qualify businesses first to build a verification queue.";
+  $("verify-results").replaceChildren();
+  for (const row of state.results || []) {
+    if (!row.verification) continue;
+    const item = document.createElement("p");
+    item.textContent = [row.domain,row.email,row.verification.replaceAll("_"," "),row.provider].filter(Boolean).join(" · ");
+    $("verify-results").append(item);
+  }
+  $("start").disabled = state.phase === "running";
+  $("download").hidden = !completed || !verifying || !state.summary;
+  $("metrics").replaceChildren();
+  for (const [key,label] of Object.entries(metrics)) {
+    if (state.summary?.[key] === undefined) continue;
+    const item = document.createElement("span");
+    item.textContent = `${label} ${state.summary[key]}`;
+    $("metrics").append(item);
+  }
+  const opened = new Set(Array.from($("results").querySelectorAll("details[open]"),item=>item.dataset.domain));
+  $("results").replaceChildren();
+  if (state.phase === "idle") $("results").textContent = "Run a campaign to see qualification results here.";
+  if (["failed","interrupted"].includes(state.phase)) $("results").textContent = "The run stopped early. Start it again to reuse completed work.";
+  const ranked = [...(state.results || [])].sort((a,b)=>(b.qualification?.fit_score ?? -1)-(a.qualification?.fit_score ?? -1));
+  for (const row of ranked) {
+    const detail = document.createElement("details"), name = document.createElement("summary"), list = document.createElement("ul");
+    detail.dataset.domain = row.domain;
+    detail.open = opened.has(row.domain);
+    const result = row.qualification;
+    name.textContent = result?.mode === "coohom"
+      ? `${row.business_name || row.domain} · ${result.fit_score}/50 · ${result.fit_bucket}`
+      : `${row.domain} · ${row.state.replaceAll("_"," ")}`;
+    for (const [key,evidence] of Object.entries(row.qualification?.criteria || {})) {
+      const item = document.createElement("li");
+      item.textContent = result.mode === "coohom"
+        ? `${coohomScores[key][0]} · ${evidence.score}/${coohomScores[key][1]}. ${evidence.excerpt || "No evidence found."} `
+        : `${criteria[key]} · ${evidence.status}. ${evidence.excerpt || ""} `;
+      try {
+        const url = new URL(evidence.page_url);
+        if (["http:","https:"].includes(url.protocol)) {
+          const link = document.createElement("a");
+          link.href = url.href; link.textContent = "Source"; link.target = "_blank"; link.rel = "noopener";
+          item.append(link);
+        }
+      } catch {}
+      list.append(item);
+    }
+    if (result?.mode === "coohom") {
+      const fields = [
+        ["Primary COOHOM angle", result.primary_angle], ["Secondary angle", result.secondary_angle],
+        ["Score before fit rules", result.raw_score !== result.fit_score ? result.raw_score + "/50" : ""],
+        ["Evidence confidence", result.confidence], ["Commercial front evidence", result.commercial_front?.excerpt],
+        ["Operating status evidence",result.operating?.excerpt], ["Website",row.website_url],
+        ...Object.entries(result.profile || {})
+      ];
+      for (const [key,value] of fields) {
+        if (!value) continue;
+        const item = document.createElement("li");
+        const label = key.replaceAll("_"," ");
+        item.textContent = label.charAt(0).toUpperCase() + label.slice(1) + " · " + value;
+        const source = result.profile_evidence?.[key]?.page_url ||
+          (key === "Commercial front evidence" ? result.commercial_front?.page_url :
+           key === "Operating status evidence" ? result.operating?.page_url : "");
+        try {
+          const url = new URL(source);
+          if (["http:","https:"].includes(url.protocol)) {
+            const link = document.createElement("a");
+            link.href = url.href; link.textContent = "Source"; link.target = "_blank"; link.rel = "noopener";
+            item.append(" ", link);
+          }
+        } catch {}
+        list.append(item);
+      }
+    }
+    if (row.reason) {
+      const item = document.createElement("li"); item.textContent = row.reason.replaceAll("_"," "); list.append(item);
+    }
+    detail.append(name,list); $("results").append(detail);
+  }
+}
+const poll = () => refresh().catch(error => $("message").textContent = error.message);
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  const fields = new FormData(form);
+  const campaign = $("qualification-mode").value === "coohom"
+    ? {mode:"coohom",market:fields.get("market"),focus:fields.get("focus"),notes:fields.get("notes")}
+    : {offer:fields.get("offer"),disqualifiers:lines(fields.get("disqualifiers"))};
+  if (campaign.mode !== "coohom") for (const key of Object.keys(criteria)) {
+    campaign[key] = {description:fields.get(key),phrases:lines(fields.get(key+"_phrases"))};
+  }
+  $("start").disabled = true;
+  try {
+    await api("/api/run",{campaign,csv:$("csv").value});
+    $("message").textContent = "Run started.";
+    await refresh();
+  } catch (error) { $("message").textContent = error.message; $("start").disabled = false; }
+});
+$("verify-start").addEventListener("click",async()=>{
+  $("verify-start").disabled = true;
+  try {
+    await api("/api/verify",{});
+    $("verify-message").textContent = "Verification started.";
+    await refresh();
+  } catch(error) {
+    $("verify-message").textContent = error.message;
+    $("verify-start").disabled = false;
+  }
+});
+$("outreach").addEventListener("submit", async event => {
+  event.preventDefault();
+  try {
+    await api("/api/event",Object.fromEntries(new FormData(event.target)));
+    $("event-message").textContent = "Event recorded.";
+    event.target.reset();
+  } catch (error) { $("event-message").textContent = error.message; }
+});
+$("upload").addEventListener("change", async event => {
+  if (event.target.files[0]) $("csv").value = await event.target.files[0].text();
+  countSelected();
+});
+async function setup() {
+  const setup = await api("/api/config");
+  const preset = setup.campaign.mode === "coohom" ? setup.campaign : setup.coohom;
+  for (const field of ["market","focus","notes"]) form.elements[field].value=preset[field];
+  form.elements.offer.value = setup.campaign.offer || "";
+  form.elements.disqualifiers.value = (setup.campaign.disqualifiers || []).join("\n");
+  for (const key of Object.keys(criteria)) {
+    form.elements[key].value = setup.campaign[key]?.description || "";
+    form.elements[key+"_phrases"].value = (setup.campaign[key]?.phrases || []).join("\n");
+  }
+  $("csv").value = setup.csv;
+  countSelected();
+  updateMode();
+  $("provider").textContent = setup.reoon ? "Reoon key file detected on the server." : "Reoon key file unavailable.";
+  await refresh();
+  setInterval(poll,2500);
+}
+setup().catch(error => $("message").textContent = error.message);
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leadengine"
+version = "0.1.0"
+description = "Local lead qualification and manual review pilot"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+dynamic = ["dependencies"]
+
+[project.scripts]
+leadengine = "lead_engine:main"
+
+[tool.setuptools]
+py-modules = ["lead_engine", "lead_discovery", "lead_coohom"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

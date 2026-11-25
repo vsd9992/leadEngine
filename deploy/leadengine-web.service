@@ -1,0 +1,12 @@
+[Unit]
+Description=leadEngine LAN dashboard
+
+[Service]
+WorkingDirectory=/home/vishnu/leadEngine
+ExecStart=/home/vishnu/leadEngine/bin/leadengine-web
+Restart=on-failure
+RestartSec=4
+UMask=0077
+
+[Install]
+WantedBy=default.target

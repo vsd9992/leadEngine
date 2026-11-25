@@ -1,0 +1,16 @@
+{
+  "offer": "Example field-service scheduling tool",
+  "location": {
+    "description": "The business operates in Seattle, Washington.",
+    "phrases": ["Seattle"]
+  },
+  "business_type": {
+    "description": "A full-service bicycle repair shop.",
+    "phrases": ["full-service repair shop", "bicycle repair shop"]
+  },
+  "buying_signal": {
+    "description": "Provides mobile repair services available for hire.",
+    "phrases": ["mobile bike repair", "mobile bicycle repair"]
+  },
+  "disqualifiers": []
+}

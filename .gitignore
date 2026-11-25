@@ -1,0 +1,16 @@
+.venv/
+.browsers/
+.crawl4ai/
+__pycache__/
+state/
+.env
+.env.*
+archive/
+campaign.local.json
+leads.local.csv
+.runtime/
+build/
+dist/
+*.egg-info/
+
+/_reoonAPI
